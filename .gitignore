@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.vscode/
+*.log
+TechnetiumIDE/
+TechnetiumIDE/config.json
+/models/

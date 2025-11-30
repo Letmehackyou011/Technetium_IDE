@@ -1,0 +1,58 @@
+{
+  "name": "electron-ui",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+  "dev": "vite",
+  "build:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js",
+  "build:preload:watch": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js --watch",
+  "electron:dev": "electron .",
+  "dev:desktop": "cross-env NODE_ENV=development concurrently \"pnpm run dev\" \"pnpm run build:preload:watch\" \"wait-on http://localhost:5173 && pnpm run electron:dev\"",
+  "build:renderer": "vite build",
+  "build:main": "esbuild src/main.ts --bundle --platform=node --target=node18 --outfile=dist/main.js",
+  "build": "pnpm run build:renderer && pnpm run build:preload && pnpm run build:main",
+  "dist": "pnpm run build && electron-builder -mwl"
+},
+  "dependencies": {
+    "framer-motion": "^12.23.24",
+    "monaco-editor": "^0.36.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "latest",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.18.20",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.yourorg.technetium",
+    "files": [
+      "dist/**",
+      "node_modules/**",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

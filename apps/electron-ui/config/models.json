@@ -1,0 +1,28 @@
+{
+  "models": [
+    {
+      "id": "demo-small",
+      "name": "Demo model (small)",
+      "display_size": "10 MB",
+      "download_url": "https://example-files.github.io/10MB/10MB.bin",
+      "sha256": "",
+      "runtime": "mock"
+    },
+    {
+      "id": "codellm-4b",
+      "name": "CodeLLM 4-bit (demo)",
+      "display_size": "2 GB",
+      "download_url": "https://cdn.example.com/codellm-4b.gguf",
+      "sha256": "abc123...",
+      "runtime": "llama_cpp"
+    },
+    {
+      "id": "ollama-coder-1",
+      "name": "Ollama Coder (example)",
+      "display_size": "8 GB",
+      "download_url": "https://ollama.example/ollama-coder.gguf",
+      "sha256": "def456...",
+      "runtime": "ollama"
+    }
+  ]
+}
