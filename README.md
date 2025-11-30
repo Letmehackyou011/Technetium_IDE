@@ -33,3 +33,5 @@ pnpm --filter electron-ui run dev:desktop
 ```
 ## Support
 > Only supports in Windows (Temporarily)
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
