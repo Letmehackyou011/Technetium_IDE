@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "dev:model": "node services/model-runner/index.js",
-    "dev:ui": "cd apps/electron-ui && pnpm run dev"
+    "dev:ui": "cd apps/electron-ui && pnpm run dev",
+    "build:ui": "pnpm -w --filter electron-ui run build",
+    "dist:windows": "pnpm -w --filter electron-ui run dist",
+    "build:all": "pnpm -w --filter electron-ui run build"
   }
 }

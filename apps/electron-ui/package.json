@@ -3,21 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "vite",
-  "build:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js",
-  "build:preload:watch": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js --watch",
-  "electron:dev": "electron .",
-  "dev:desktop": "cross-env NODE_ENV=development concurrently \"pnpm run dev\" \"pnpm run build:preload:watch\" \"wait-on http://localhost:5173 && pnpm run electron:dev\"",
-  "build:renderer": "vite build",
-  "build:main": "esbuild src/main.ts --bundle --platform=node --target=node18 --outfile=dist/main.js",
-  "build": "pnpm run build:renderer && pnpm run build:preload && pnpm run build:main",
-  "dist": "pnpm run build && electron-builder -mwl"
-},
+    "dev": "vite",
+    "build:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js --external:electron",
+    "build:preload:watch": "esbuild src/preload.ts --bundle --platform=node --target=node18 --outfile=dist/preload.js --external:electron --watch",
+    "electron:dev": "\"D:\\electron-v39.2.5-win32-x64\\electron.exe\" .",
+    "dev:desktop": "cross-env NODE_ENV=development concurrently \"pnpm run dev\" \"pnpm run build:preload:watch\" \"wait-on http://localhost:5173 && pnpm run electron:dev\"",
+    "build:renderer": "vite build",
+    "build:main": "esbuild src/main.ts --bundle --platform=node --target=node18 --outfile=dist/main.js --external:electron",
+    "build": "pnpm run build:renderer && pnpm run build:preload && pnpm run build:main",
+    "dist": "pnpm run build && electron-builder -w --x64"
+  },
+  "main": "dist/main.js",
   "dependencies": {
     "framer-motion": "^12.23.24",
     "monaco-editor": "^0.36.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -25,7 +27,6 @@
     "autoprefixer": "^10.4.22",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron": "latest",
     "electron-builder": "^24.13.3",
     "esbuild": "^0.18.20",
     "postcss": "^8.5.6",
@@ -39,7 +40,8 @@
     "files": [
       "dist/**",
       "node_modules/**",
-      "package.json"
+      "package.json",
+      "../services/model-runner/**"
     ],
     "directories": {
       "buildResources": "build"

@@ -1,129 +1,338 @@
-// apps/electron-ui/src/ui/AppUI.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import FirstRunWizard from '../components/FirstRunWizard';
-import ModelManager from '../components/ModelManager';
-import * as monaco from 'monaco-editor';
+import React, { useEffect, useRef, useState } from "react";
+import * as monaco from "monaco-editor";
+import ChatPanel from "../components/ChatPanel";
+import ModelDownloadPanel from "../components/ModelDownloadPanel";
+import FileExplorer, { TreeNode } from "../components/FileExplorer";
 
-export default function AppUI(){
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor|null>(null);
-  const containerRef = useRef<HTMLDivElement|null>(null);
-  const [dark, setDark] = useState<boolean>(true);
-  const [modelStatus, setModelStatus] = useState<'running'|'stopped'|'unknown'>('unknown');
+declare global {
+  interface Window {
+    technetium?: any;
+  }
+}
 
-  useEffect(()=>{
-    // theme on body
-    if(dark) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  },[dark]);
+type OpenTab = {
+  path: string;
+  label: string;
+};
 
-  useEffect(()=>{
-    if(containerRef.current && !editorRef.current){
-      editorRef.current = monaco.editor.create(containerRef.current, {
-        value: `// Technetium IDE — ${new Date().toLocaleString()}\nfunction hello(){\n  console.log("hi");\n}\n`,
-        language: 'javascript',
+const AppUI: React.FC = () => {
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+
+  const [dark, setDark] = useState(true);
+  const [tree, setTree] = useState<TreeNode | null>(null);
+  const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // init editor
+  useEffect(() => {
+    if (!editorRef.current && editorContainerRef.current) {
+      editorRef.current = monaco.editor.create(editorContainerRef.current, {
+        value:
+          `// Technetium IDE — ${new Date().toLocaleString()}\n` +
+          `function hello(){\n  console.log("hi");\n}\n`,
+        language: "javascript",
+        theme: "vs-dark",
         minimap: { enabled: false },
         automaticLayout: true,
-        theme: dark ? 'vs-dark' : 'vs',
+        fontFamily: 'Consolas, "Courier New", monospace',
         fontSize: 13,
       });
     }
-    // sync monaco theme on toggle
-    return () => {};
-  },[containerRef, dark]);
+  }, []);
 
-  // quick ping to model health every 5s (uses preload)
-  useEffect(()=>{
-    let t: any = null;
-    async function tick(){
-      try{
-        // @ts-ignore
-        const res = await (window as any).technetium.getHealth();
-        setModelStatus(res?.ok ? 'running' : 'stopped');
-      }catch(e){ setModelStatus('stopped'); }
+  // theme
+  useEffect(() => {
+    document.body.classList.toggle("dark", dark);
+    if (editorRef.current) {
+      monaco.editor.setTheme(dark ? "vs-dark" : "vs");
     }
-    tick();
-    t = setInterval(tick, 5000);
-    return ()=>clearInterval(t);
-  },[]);
+  }, [dark]);
+
+  async function handleOpenFolder() {
+    const res = await window.technetium?.openFolder?.();
+    if (res?.ok) {
+      setTree(res.tree);
+      setWorkspaceRoot(res.root);
+      setOpenTabs([]);
+      setActiveTab(null);
+      editorRef.current?.setValue("");
+    } else if (!res?.canceled) {
+      alert("Failed to open folder: " + (res?.error || "Unknown error"));
+    }
+  }
+
+  async function handleRefresh() {
+    if (!workspaceRoot) return;
+    const res = await window.technetium?.openFolder?.();
+    // simple approach: just reopen root dialog again is annoying;
+    // for now, we ignore refresh and rely on operations updating tree.
+    // You can wire a dedicated "get-tree" later if you want.
+  }
+
+  async function handleOpenFile(node: TreeNode) {
+    const res = await window.technetium?.readFile?.(node.fullPath);
+    if (!res?.ok) {
+      alert("Failed to read file: " + (res?.error || "Unknown error"));
+      return;
+    }
+    editorRef.current?.setValue(res.text || "");
+    setActiveTab(node.fullPath);
+    setOpenTabs((tabs) => {
+      if (tabs.find((t) => t.path === node.fullPath)) return tabs;
+      return [...tabs, { path: node.fullPath, label: node.name }];
+    });
+  }
+
+  async function handleSave() {
+    if (!activeTab || !editorRef.current) return;
+    setSaving(true);
+    try {
+      const text = editorRef.current.getValue();
+      const res = await window.technetium?.writeFile?.(activeTab, text);
+      if (!res?.ok) {
+        alert("Failed to save file: " + (res?.error || "Unknown error"));
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function closeTab(path: string) {
+    setOpenTabs((tabs) => tabs.filter((t) => t.path !== path));
+    if (activeTab === path) {
+      const remaining = openTabs.filter((t) => t.path !== path);
+      const next = remaining[remaining.length - 1];
+      setActiveTab(next ? next.path : null);
+      if (next) {
+        window.technetium
+          ?.readFile?.(next.path)
+          .then((res: any) => res?.ok && editorRef.current?.setValue(res.text));
+      } else {
+        editorRef.current?.setValue("");
+      }
+    }
+  }
 
   return (
-    <div className="app-shell">
-      {/* Left column */}
-      <aside style={{width:360, padding:12}} className="panel flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Technetium</h2>
-            <div className="text-sm text-[color:var(--muted)]">Local AI IDE</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`px-2 py-1 rounded-md text-sm`} style={{background: modelStatus==='running' ? 'rgba(16,185,129,0.12)' : 'rgba(220,38,38,0.08)'}}>
-              <span style={{color: modelStatus==='running' ? 'var(--accent)' : 'var(--muted)'}}>{modelStatus==='running' ? 'Model running' : 'Stopped'}</span>
-            </div>
-            <button onClick={()=>setDark(d=>!d)} title="Toggle theme" className="p-1 rounded-md hover:bg-[color:var(--glass)]">
-              {dark ? '🌙' : '☀️'}
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        fontFamily: '"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont',
+      }}
+    >
+      {/* Activity bar (left icons) */}
+      <div
+        style={{
+          width: 48,
+          background: "#20232a",
+          color: "#eee",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: 8,
+          gap: 8,
+          fontSize: 20,
+        }}
+      >
+        <div title="Explorer">📁</div>
+        <div title="Search">🔍</div>
+        <div title="Extensions">🧩</div>
+      </div>
+
+      {/* Main column: sidebar + editor */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* Title bar mimic */}
+        <div
+          style={{
+            height: 28,
+            background: "#2d2d2d",
+            color: "#ddd",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 8px",
+            fontSize: 12,
+          }}
+        >
+          <span style={{ opacity: 0.8 }}>
+            Technetium IDE — {workspaceRoot || "No Folder Opened"}
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setDark((d) => !d)}
+              style={{
+                fontSize: 11,
+                padding: "2px 6px",
+                borderRadius: 3,
+                border: "1px solid #555",
+                background: dark ? "#3a3a3a" : "#f0f0f0",
+                color: dark ? "#fff" : "#111",
+              }}
+            >
+              {dark ? "☀" : "🌙"}
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <FirstRunWizard />
-        </div>
+        <div style={{ flex: 1, display: "flex" }}>
+          {/* Sidebar like VS Code (Explorer, Models, Chat) */}
+          <aside
+            style={{
+              width: 320,
+              borderRight: "1px solid #333",
+              padding: 8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              background: dark ? "#1e1e1e" : "#f5f5f5",
+              color: dark ? "#f5f5f5" : "#111",
+            }}
+          >
+            <FileExplorer
+              tree={tree}
+              workspaceRoot={workspaceRoot}
+              onOpenFolder={handleOpenFolder}
+              onOpenFile={handleOpenFile}
+              onRefresh={handleRefresh}
+            />
 
-        <div>
-          <ModelManager />
-        </div>
-      </aside>
+            <div
+              style={{
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #333",
+                background: dark ? "#181818" : "#ffffff",
+              }}
+            >
+              <ModelDownloadPanel />
+            </div>
 
-      {/* Center editor */}
-      <main style={{flex:1, display:'flex', flexDirection:'column', minWidth:0}}>
-        <div style={{display:'flex', alignItems:'center', gap:12, padding:'8px 12px'}} className="panel">
-          <div className="flex-1 text-sm text-[color:var(--muted)]">Project: <b>untitled</b></div>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-1 rounded-md border" onClick={()=>{
-              // save or open action
-            }}>Files</button>
-            <button className="px-3 py-1 rounded-md bg-[color:var(--accent)] text-white" onClick={async ()=>{
-              // quick refine: call chat with selection
-              const editor = editorRef.current!;
-              const prompt = editor.getValue();
-              try{
-                const res = await fetch('http://127.0.0.1:11434/v1/completions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
-                const json = await res.json();
-                const text = json.choices?.[0]?.text || '';
-                const pos = editor.getPosition();
-                editor.executeEdits('ai',[{range:new monaco.Range(pos.lineNumber,pos.column,pos.lineNumber,pos.column), text}]);
-              }catch(e){
-                console.error(e);
-              }
-            }}>AI: Quick Assist</button>
-          </div>
-        </div>
-
-        <div style={{flex:1, display:'flex', minHeight:0}}>
-          <div style={{flex:1}} ref={containerRef} className="p-2" />
-          {/* Right AI panel */}
-          <aside style={{width:340, padding:12}} className="panel">
-            <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.25}}>
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">AI Chat</h4>
-                <div className="text-sm text-[color:var(--muted)]">Local</div>
-              </div>
-
-              <div style={{marginTop:12}}>
-                <div className="h-64 rounded-md border p-2 overflow-auto text-sm" style={{background:'transparent'}}>
-                  <div className="text-[color:var(--muted)]">Ask the active model questions about your code, request refactors, or generate tests.</div>
-                </div>
-              </div>
-
-              <div style={{marginTop:12, display:'flex', gap:8}}>
-                <input placeholder="Type a question..." className="flex-1 p-2 rounded-md border bg-[color:var(--panel)]" />
-                <button className="px-3 py-2 bg-[color:var(--accent)] text-white rounded-md">Send</button>
-              </div>
-            </motion.div>
+            <div
+              style={{
+                marginTop: 4,
+                paddingTop: 4,
+                borderTop: "1px solid #333",
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <ChatPanel />
+            </div>
           </aside>
+
+          {/* Editor area */}
+          <main
+            style={{
+              flex: 1,
+              background: dark ? "#1e1e1e" : "#ffffff",
+              color: dark ? "#eee" : "#111",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Tabs bar */}
+            <div
+              style={{
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                background: dark ? "#252526" : "#e1e1e1",
+                borderBottom: "1px solid #333",
+                overflowX: "auto",
+              }}
+            >
+              {openTabs.map((tab) => (
+                <div
+                  key={tab.path}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "0 8px",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    background:
+                      activeTab === tab.path
+                        ? dark
+                          ? "#1e1e1e"
+                          : "#ffffff"
+                        : "transparent",
+                    borderRight: "1px solid #333",
+                  }}
+                  onClick={() => {
+                    setActiveTab(tab.path);
+                    window.technetium
+                      ?.readFile?.(tab.path)
+                      .then((res: any) =>
+                        res?.ok && editorRef.current?.setValue(res.text)
+                      );
+                  }}
+                >
+                  <span style={{ marginRight: 6 }}>{tab.label}</span>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.path);
+                    }}
+                  >
+                    ×
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Editor */}
+            <div
+              ref={editorContainerRef}
+              style={{ flex: 1, minHeight: 0 }}
+            />
+
+            {/* Status bar */}
+            <div
+              style={{
+                height: 22,
+                background: "#007acc",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 8px",
+                fontSize: 11,
+              }}
+            >
+              <span>
+                {activeTab
+                  ? activeTab.replace(workspaceRoot || "", "")
+                  : "No file"}
+              </span>
+              <span>
+                {saving ? "Saving..." : "Ready"} | AI: Local | Press Ctrl+S to
+                save (future)
+              </span>
+              <button
+                onClick={handleSave}
+                disabled={!activeTab || saving}
+                style={{
+                  fontSize: 11,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  border: "none",
+                  background: "#fff",
+                  color: "#007acc",
+                  cursor: !activeTab || saving ? "default" : "pointer",
+                  opacity: !activeTab ? 0.6 : 1,
+                }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
-}
+};
+
+export default AppUI;

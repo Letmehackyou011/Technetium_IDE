@@ -14,3 +14,20 @@ module.exports = {
   },
   plugins: [],
 };
+
+.monaco-editor .ghost-suggestion {
+  opacity: 0.45;
+  color: var(--muted);
+  font-style: normal;
+}
+.monaco-editor .ghost-suggestion.accepted {
+  opacity: 0.7;
+  color: var(--text);
+}
+
+/* Ghost suggestion style for Monaco after content */
+.ghost-suggestion {
+  opacity: 0.45;
+  color: var(--muted);
+  font-style: normal;
+}

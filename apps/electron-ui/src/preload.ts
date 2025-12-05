@@ -1,17 +1,25 @@
-// apps/electron-ui/src/preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld('technetium', {
-  // Downloads a model using the repository script. Returns stdout/stderr text on success or throws.
-  downloadModel: (url: string, sha?: string) => ipcRenderer.invoke('download-model', url, sha),
+contextBridge.exposeInMainWorld("technetium", {
+  // AI
+  askModel: (prompt: string) => ipcRenderer.invoke("askModel", prompt),
+  downloadModel: (modelId: string) =>
+    ipcRenderer.invoke("download-model", modelId),
 
-  // Health check via main process (pings local model endpoint)
-  getHealth: () => ipcRenderer.invoke('model-health'),
+  
 
-  // Start/Stop the model runner (spawn/unspawn the process from main)
-  startModel: () => ipcRenderer.invoke('start-model'),
-  stopModel: () => ipcRenderer.invoke('stop-model'),
-
-  // simple ping
-  ping: () => ipcRenderer.invoke('ping'),
+  // Workspace / FS
+  openFolder: () => ipcRenderer.invoke("open-folder"),
+  readFile: (filePath: string) => ipcRenderer.invoke("read-file", filePath),
+  writeFile: (filePath: string, contents: string) =>
+    ipcRenderer.invoke("write-file", filePath, contents),
+  newFile: (dirPath: string, name: string) =>
+    ipcRenderer.invoke("new-file", dirPath, name),
+  newFolder: (dirPath: string, name: string) =>
+    ipcRenderer.invoke("new-folder", dirPath, name),
+  deleteEntry: (fullPath: string) =>
+    ipcRenderer.invoke("delete-entry", fullPath),
+  renameEntry: (oldPath: string, newPath: string) =>
+    ipcRenderer.invoke("rename-entry", oldPath, newPath),
+  
 });
